@@ -1,0 +1,200 @@
+# ========================================
+# Brain Tumor Segmentation - .gitignore
+# ========================================
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ===== Virtual Environments =====
+.venv/
+venv/
+ENV/
+env/
+.env
+.env.local
+.env.*.local
+
+# ===== IDE & Editors =====
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+
+# ===== OS Generated Files =====
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ===== ML Data & Artifacts =====
+# Data folders (large files)
+ml/data/train/images/*
+ml/data/train/masks/*
+ml/data/val/images/*
+ml/data/val/masks/*
+!ml/data/train/images/.gitkeep
+!ml/data/train/masks/.gitkeep
+!ml/data/val/images/.gitkeep
+!ml/data/val/masks/.gitkeep
+
+# Model artifacts (large files)
+ml/artifacts/
+*.h5
+*.hdf5
+*.keras
+*.tflite
+*.onnx
+*.pb
+*.pth
+*.pt
+*.ckpt
+*.weights
+
+# TensorBoard logs
+tensorboard/
+runs/
+logs/
+*.tfevents.*
+
+# ===== Web Application =====
+# Uploaded files
+web/app/static/uploads/*
+!web/app/static/uploads/.gitkeep
+
+# Test images (optional - uncomment if needed)
+# web/static/test_images/*
+
+# ===== Jupyter Notebooks =====
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+*.nbconvert.ipynb
+
+# ===== Testing =====
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# ===== Logs =====
+*.log
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===== Temporary Files =====
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+
+# ===== Package Managers =====
+# pip
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Poetry
+poetry.lock
+
+# Pipenv
+Pipfile.lock
+
+# ===== Build Outputs =====
+*.manifest
+*.spec
+
+# ===== Documentation =====
+docs/_build/
+site/
+
+# ===== Secrets & Config =====
+*.pem
+*.key
+secrets.yaml
+secrets.json
+config.local.yaml
+.env.production
+
+# ===== Large Files =====
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+*.nii
+*.nii.gz
+*.dcm
+*.dicom
+
+# ===== Misc =====
+.cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beyin MR Tümör Segmentasyonu</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>🧠 Beyin MR Tümör Segmentasyonu</h1>
+            <p class="subtitle">U-Net Modeli ile Otomatik Segmentasyon</p>
+        </header>
+
+        <!-- Model Status -->
+        <div class="model-status">
+            <span class="status-label">Model Durumu:</span>
+            <span id="modelStatus" class="status-indicator loading">{{ model_status }}</span>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Upload Section -->
+            <section class="upload-section">
+                <h2>📁 MR Görüntüsü Yükleyin</h2>
+                
+                <div class="upload-area" id="uploadArea">
+                    <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <p class="upload-text">Dosyayı buraya sürükleyin veya tıklayın</p>
+                    <p class="upload-hint">PNG, JPG, DICOM (8-bit/16-bit MR görüntüleri desteklenir)</p>
+                    <input type="file" id="fileInput" accept="image/png,image/jpeg,.dcm" hidden>
+                </div>
+
+                <div class="file-info" id="fileInfo" style="display: none;">
+                    <p>Seçilen dosya: <strong id="fileName"></strong></p>
+                    <button class="btn btn-primary" id="processBtn">🚀 Segmentasyon Yap</button>
+                    <button class="btn btn-secondary" id="clearBtn">↻ Temizle</button>
+                </div>
+
+                <div class="loading-spinner" id="loadingSpinner" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Segmentasyon işleniyor...</p>
+                </div>
+
+                <!-- Data Klasöründeki Görüntüler -->
+                <div class="data-images-section">
+                    <h3>📂 Data Klasöründeki Görüntüler</h3>
+                    <div class="data-controls">
+                        <select id="datasetFilter" class="dataset-filter">
+                            <option value="all">Tümü (Train + Val)</option>
+                            <option value="train">Train</option>
+                            <option value="val">Validation</option>
+                        </select>
+                        <input type="text" id="searchImages" placeholder="Görüntü ara..." class="search-input">
+                        <button class="btn btn-secondary" id="refreshDataBtn">🔄 Yenile</button>
+                    </div>
+                    <div class="data-images-grid" id="dataImagesGrid">
+                        <p class="loading-text">Görüntüler yükleniyor...</p>
+                    </div>
+                    <div class="pagination" id="pagination" style="display: none;">
+                        <button class="btn btn-secondary" id="prevPageBtn">← Önceki</button>
+                        <span id="pageInfo">Sayfa 1 / 1</span>
+                        <button class="btn btn-secondary" id="nextPageBtn">Sonraki →</button>
+                    </div>
+                </div>
+
+                <!-- Test Görüntüleri -->
+                <div class="test-images-section">
+                    <h3>📸 Test Görüntülerini Kullan</h3>
+                    <div class="test-images-grid">
+                        <div class="test-image-card" onclick="loadTestImage('/static/test_images/test_brain_1.png', 'test_brain_1.png')">
+                            <img src="/static/test_images/test_brain_1.png" alt="Test 1">
+                            <p>Beyin MR 1</p>
+                        </div>
+                        <div class="test-image-card" onclick="loadTestImage('/static/test_images/test_brain_2.png', 'test_brain_2.png')">
+                            <img src="/static/test_images/test_brain_2.png" alt="Test 2">
+                            <p>Beyin MR 2</p>
+                        </div>
+                        <div class="test-image-card" onclick="loadTestImage('/static/test_images/test_brain_3.png', 'test_brain_3.png')">
+                            <img src="/static/test_images/test_brain_3.png" alt="Test 3">
+                            <p>Beyin MR 3</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="resultsSection" style="display: none;">
+                <h2>📊 Segmentasyon Sonuçları</h2>
+                
+                <div class="results-grid">
+                    <!-- Original Image -->
+                    <div class="result-card">
+                        <h3>Orijinal Görüntü</h3>
+                        <div class="image-container">
+                            <canvas id="originalCanvas" width="256" height="256"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Mask -->
+                    <div class="result-card">
+                        <h3>Segmentasyon Maskesi</h3>
+                        <div class="image-container">
+                            <canvas id="maskCanvas" width="256" height="256"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Overlay -->
+                    <div class="result-card full-width">
+                        <h3>Overlay Görünümü</h3>
+                        <div class="image-container-large">
+                            <canvas id="overlayCanvas" width="512" height="512"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Metrics -->
+                <div class="metrics-section">
+                    <h3>📈 Performans Metrikleri</h3>
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <h4>DICE Katsayısı</h4>
+                            <div class="metric-value" id="diceValue">-</div>
+                            <p class="metric-desc">Benzerlik oranı (0-1)</p>
+                        </div>
+                        <div class="metric-card">
+                            <h4>IoU (Jaccard)</h4>
+                            <div class="metric-value" id="iouValue">-</div>
+                            <p class="metric-desc">Kesişim oranı (0-1)</p>
+                        </div>
+                        <div class="metric-card">
+                            <h4>Tümör Hacmi</h4>
+                            <div class="metric-value" id="volumeValue">-</div>
+                            <p class="metric-desc">Piksel sayısı</p>
+                        </div>
+                        <div class="metric-card">
+                            <h4>Tümör Alanı</h4>
+                            <div class="metric-value" id="areaValue">-</div>
+                            <p class="metric-desc">Pixelden alan</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Download Section -->
+                <div class="download-section">
+                    <h3>💾 Sonuçları İndir</h3>
+                    <div class="button-group">
+                        <button class="btn btn-secondary" id="downloadMask">Maske İndir</button>
+                        <button class="btn btn-secondary" id="downloadOverlay">Overlay İndir</button>
+                        <button class="btn btn-secondary" id="downloadReport">Rapor İndir (JSON)</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Error Section -->
+            <section class="error-section" id="errorSection" style="display: none;">
+                <h2>⚠️ Hata</h2>
+                <p id="errorMessage"></p>
+                <button class="btn btn-primary" id="retryBtn">Tekrar Dene</button>
+            </section>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>&copy; 2024 Beyin Tümör Segmentasyonu Projesi | TensorFlow + U-Net</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

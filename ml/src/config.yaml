@@ -1,0 +1,30 @@
+experiment_name: "unet_brain_tumor"
+seed: 42
+
+paths:
+  train_images: "C:/Users/Lenovo/Desktop/repo/BrSegmantion/ml/data/train/images"
+  train_masks:  "C:/Users/Lenovo/Desktop/repo/BrSegmantion/ml/data/train/masks"
+  val_images:   "C:/Users/Lenovo/Desktop/repo/BrSegmantion/ml/data/val/images"
+  val_masks:    "C:/Users/Lenovo/Desktop/repo/BrSegmantion/ml/data/val/masks"
+  artifacts_dir: "C:/Users/Lenovo/Desktop/repo/BrSegmantion/ml/artifacts"
+training:
+  img_size: 256
+  batch_size: 2
+  epochs: 30
+  learning_rate: 0.0001
+  optimizer: "adam"
+  loss: "bce_dice"
+  metrics:
+    - "dice"
+    - "iou"
+
+augmentation:
+  random_flip: true
+  random_rotate: false
+  random_zoom: false
+
+export:
+  save_best_only: true
+  tflite: true
+  onnx: false
+
