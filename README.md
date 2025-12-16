@@ -201,7 +201,7 @@ Input (256x256x1)
 |-----------|------------|----------|
 | `img_size` | 256 | Görüntü boyutu |
 | `batch_size` | 4 | Batch boyutu |
-| `epochs` | 100 | Eğitim epoch sayısı |
+| `epochs` | 80 | Eğitim epoch sayısı |
 | `learning_rate` | 0.0001 | Öğrenme oranı |
 | `optimizer` | adam | Optimizer |
 | `loss` | bce_dice | Loss fonksiyonu |
