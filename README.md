@@ -200,7 +200,7 @@ Input (256x256x1)
 | Parametre | Varsayılan | Açıklama |
 |-----------|------------|----------|
 | `img_size` | 256 | Görüntü boyutu |
-| `batch_size` | 2 | Batch boyutu |
+| `batch_size` | 4 | Batch boyutu |
 | `epochs` | 100 | Eğitim epoch sayısı |
 | `learning_rate` | 0.0001 | Öğrenme oranı |
 | `optimizer` | adam | Optimizer |
