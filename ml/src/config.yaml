@@ -9,8 +9,8 @@ paths:
   artifacts_dir: "C:/Users/Lenovo/Desktop/repo/BrSegmantion/ml/artifacts"
 training:
   img_size: 256
-  batch_size: 2
-  epochs: 30
+  batch_size: 4
+  epochs: 75
   learning_rate: 0.0001
   optimizer: "adam"
   loss: "bce_dice"
@@ -20,8 +20,8 @@ training:
 
 augmentation:
   random_flip: true
-  random_rotate: false
-  random_zoom: false
+  random_rotate: true
+  random_zoom: true
 
 export:
   save_best_only: true

@@ -43,7 +43,7 @@ html, body {
 
 /* ===== HEADER ===== */
 .header {
-    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    background: linear-gradient(135deg, #2563eb 0%, #000102 100%);
     color: white;
     padding: 40px;
     text-align: center;
@@ -453,7 +453,7 @@ section h2 {
 /* ===== RESULTS SECTION ===== */
 .results-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
     gap: 24px;
     margin-bottom: 32px;
 }
@@ -645,6 +645,18 @@ canvas {
 
     .results-grid {
         grid-template-columns: 1fr;
+    }
+    
+    @media (min-width: 769px) {
+        .results-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    
+    @media (min-width: 1200px) {
+        .results-grid {
+            grid-template-columns: repeat(4, 1fr);
+        }
     }
 
     .metrics-grid {

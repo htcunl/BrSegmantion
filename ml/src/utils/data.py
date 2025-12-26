@@ -43,7 +43,7 @@ def _load_image(path: tf.Tensor, img_size: int, channels: int = 1, is_mask: bool
     return image
 
 
-def _augment(image: tf.Tensor, mask: tf.Tensor, config: dict) -> Tuple[tf.Tensor, tf.Tensor]:
+def _augment(image: tf.Tensor, mask: tf.Tensor, config: dict, img_size: int) -> Tuple[tf.Tensor, tf.Tensor]:
     if config.get("random_flip", False):
         if tf.random.uniform(()) > 0.5:
             image = tf.image.flip_left_right(image)
@@ -64,8 +64,15 @@ def _augment(image: tf.Tensor, mask: tf.Tensor, config: dict) -> Tuple[tf.Tensor
         new_size = tf.cast(target_size * scale, tf.int32)
         image = tf.image.resize(image, new_size)
         mask = tf.image.resize(mask, new_size, method="nearest")
-        image = tf.image.resize_with_crop_or_pad(image, tf.shape(mask)[0], tf.shape(mask)[1])
-        mask = tf.image.resize_with_crop_or_pad(mask, tf.shape(image)[0], tf.shape(image)[1])
+        # Crop or pad to original size
+        image = tf.image.resize_with_crop_or_pad(image, img_size, img_size)
+        mask = tf.image.resize_with_crop_or_pad(mask, img_size, img_size)
+    
+    # Ensure final size is correct after all augmentations
+    image = tf.image.resize(image, (img_size, img_size), method="bilinear")
+    mask = tf.image.resize(mask, (img_size, img_size), method="nearest")
+    # Re-binarize mask after resize
+    mask = tf.where(mask > 0.5, 1.0, 0.0)
     return image, mask
 
 
@@ -103,7 +110,10 @@ def create_dataset(
         image = _load_image(image_path, img_size, channels=1, is_mask=False)
         mask = _load_image(mask_path, img_size, channels=1, is_mask=True)
         if augment:
-            image, mask = _augment(image, mask, augmentation_config or {})
+            image, mask = _augment(image, mask, augmentation_config or {}, img_size)
+        # Ensure shapes are correct
+        image.set_shape((img_size, img_size, 1))
+        mask.set_shape((img_size, img_size, 1))
         return image, mask
 
     dataset = dataset.map(_load, num_parallel_calls=tf.data.AUTOTUNE)

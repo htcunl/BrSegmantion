@@ -1,9 +1,4 @@
-/**
- * Beyin MR Tümör Segmentasyonu Web Uygulaması
- * Frontend JavaScript
- */
 
-// ===== STATE MANAGEMENT =====
 const state = {
     selectedFile: null,
     results: null,
@@ -31,18 +26,8 @@ const modelStatus = document.getElementById('modelStatus');
 // Canvas elements
 const originalCanvas = document.getElementById('originalCanvas');
 const maskCanvas = document.getElementById('maskCanvas');
+const segmentedCanvas = document.getElementById('segmentedCanvas');
 const overlayCanvas = document.getElementById('overlayCanvas');
-
-// Metric elements
-const diceValue = document.getElementById('diceValue');
-const iouValue = document.getElementById('iouValue');
-const volumeValue = document.getElementById('volumeValue');
-const areaValue = document.getElementById('areaValue');
-
-// Download buttons
-const downloadMaskBtn = document.getElementById('downloadMask');
-const downloadOverlayBtn = document.getElementById('downloadOverlay');
-const downloadReportBtn = document.getElementById('downloadReport');
 
 // Data images elements
 const dataImagesGrid = document.getElementById('dataImagesGrid');
@@ -67,10 +52,6 @@ retryBtn.addEventListener('click', () => {
     hideError();
     clearSelection();
 });
-
-downloadMaskBtn.addEventListener('click', () => downloadImage(maskCanvas, 'mask.png'));
-downloadOverlayBtn.addEventListener('click', () => downloadImage(overlayCanvas, 'overlay.png'));
-downloadReportBtn.addEventListener('click', downloadReport);
 
 // Data images event listeners
 if (datasetFilter) {
@@ -149,20 +130,6 @@ function handleFileSelect(e) {
     hideError();
 }
 
-function loadTestImage(imagePath, imageName) {
-    // Test görüntüsünü yükle
-    fetch(imagePath)
-        .then(response => response.blob())
-        .then(blob => {
-            const file = new File([blob], imageName, { type: 'image/png' });
-            state.selectedFile = file;
-            fileName.textContent = imageName;
-            uploadArea.style.display = 'none';
-            fileInfo.style.display = 'flex';
-            hideError();
-        })
-        .catch(error => showError('Test görüntüsü yüklenemedi: ' + error));
-}
 
 // ===== IMAGE PROCESSING =====
 async function processImage() {
@@ -216,9 +183,6 @@ async function processImage() {
         // Görüntüleri göster
         displayResults(data);
         
-        // Metrikleri hesapla
-        calculateMetrics();
-        
         // UI güncelle
         loadingSpinner.style.display = 'none';
         resultsSection.style.display = 'block';
@@ -238,6 +202,7 @@ function displayResults(data) {
     const images = {
         original: originalCanvas,
         mask: maskCanvas,
+        segmented: segmentedCanvas,
         overlay: overlayCanvas
     };
     
@@ -253,104 +218,6 @@ function displayResults(data) {
     });
 }
 
-function calculateMetrics() {
-    if (!state.results) return;
-    
-    // Eğer backend'den gelen metrikler varsa onları kullan
-    if (state.results.metrics) {
-        const metrics = state.results.metrics;
-        diceValue.textContent = metrics.dice !== undefined ? metrics.dice.toFixed(3) : '-';
-        iouValue.textContent = metrics.iou !== undefined ? metrics.iou.toFixed(3) : '-';
-        
-        // Tümör hacmi ve alanı için canvas'dan hesapla
-        try {
-            const maskCtx = maskCanvas.getContext('2d');
-            const maskData = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
-            const pixels = maskData.data;
-            
-            let tumorPixels = 0;
-            for (let i = 0; i < pixels.length; i += 4) {
-                if (pixels[i] > 100) { // Kırmızı kanal
-                    tumorPixels++;
-                }
-            }
-            
-            const totalPixels = (maskCanvas.width * maskCanvas.height);
-            const tumorPercentage = ((tumorPixels / totalPixels) * 100).toFixed(2);
-            
-            volumeValue.textContent = tumorPixels.toLocaleString();
-            areaValue.textContent = tumorPercentage + '%';
-        } catch (error) {
-            volumeValue.textContent = '-';
-            areaValue.textContent = '-';
-        }
-        
-        return;
-    }
-    
-    // Canvas'lardan piksel verilerini al (fallback)
-    try {
-        const maskCtx = maskCanvas.getContext('2d');
-        const maskData = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
-        const pixels = maskData.data;
-        
-        // Tümör pikselleri say (R kanalı > 100)
-        let tumorPixels = 0;
-        for (let i = 0; i < pixels.length; i += 4) {
-            if (pixels[i] > 100) { // Kırmızı kanal
-                tumorPixels++;
-            }
-        }
-        
-        const totalPixels = (maskCanvas.width * maskCanvas.height);
-        const tumorPercentage = ((tumorPixels / totalPixels) * 100).toFixed(2);
-        
-        // Eğer ground truth yoksa metrikleri gösterme
-        diceValue.textContent = '-';
-        iouValue.textContent = '-';
-        volumeValue.textContent = tumorPixels.toLocaleString();
-        areaValue.textContent = tumorPercentage + '%';
-        
-    } catch (error) {
-        console.error('Metrik hesaplama hatası:', error);
-        diceValue.textContent = '-';
-        iouValue.textContent = '-';
-        volumeValue.textContent = '-';
-        areaValue.textContent = '-';
-    }
-}
-
-// ===== DOWNLOAD FUNCTIONS =====
-function downloadImage(canvas, filename) {
-    const link = document.createElement('a');
-    link.href = canvas.toDataURL('image/png');
-    link.download = filename;
-    link.click();
-}
-
-function downloadReport() {
-    if (!state.results) return;
-    
-    const report = {
-        timestamp: state.results.timestamp,
-        filename: state.results.filename,
-        metrics: state.results.metrics || {
-            dice: parseFloat(diceValue.textContent),
-            iou: parseFloat(iouValue.textContent),
-            tumorPixels: parseInt(volumeValue.textContent.replace(/,/g, '')),
-            tumorPercentage: parseFloat(areaValue.textContent)
-        }
-    };
-    
-    const dataStr = JSON.stringify(report, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `segmentation_report_${Date.now()}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-}
 
 // ===== UI FUNCTIONS =====
 function clearSelection() {
@@ -514,9 +381,6 @@ async function loadDataImage(imageInfo) {
         
         // Görüntüleri göster
         displayResults(data);
-        
-        // Metrikleri hesapla
-        calculateMetrics();
         
         // UI güncelle
         loadingSpinner.style.display = 'none';

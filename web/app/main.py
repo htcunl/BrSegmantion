@@ -199,7 +199,7 @@ def create_mock_mask(image):
 def predict_segmentation(image_path):
     """Segmentasyon tahmini yap"""
     if MODEL is None or (isinstance(MODEL, str) and MODEL == "mock"):
-        return None, None, None, {"error": "Model yüklenmedi"}
+        return None, None, None, None, {"error": "Model yüklenmedi"}
     
     try:
         # Görüntüyü oku
@@ -210,7 +210,7 @@ def predict_segmentation(image_path):
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         
         if image is None:
-            return None, None, None, {"error": "Görüntü okunamadı"}
+            return None, None, None, None, {"error": "Görüntü okunamadı"}
         
         original_shape = image.shape
         
@@ -218,11 +218,13 @@ def predict_segmentation(image_path):
         image_batch, image_resized = preprocess_image(image)
         
         # Tahmin
+        probability_map = None
         if isinstance(MODEL, str) and MODEL == "mock":
             # Mock segmentasyon (model test amaçlı)
             print("[WARNING] Mock model kullanılıyor")
             mask = create_mock_mask(image_resized)
             mask_binary = (mask > 0.5).astype(np.uint8) * 255
+            probability_map = mask  # Mock için probability map = mask
         else:
             # Gerçek model
             load_tensorflow()
@@ -246,8 +248,11 @@ def predict_segmentation(image_path):
                         prediction = MODEL.predict(image_batch, verbose=0)
                         print(f"[DEBUG] Keras prediction shape: {prediction.shape}")
                     
-                    mask = prediction[0, :, :, 0]
-                    print(f"[DEBUG] Mask shape: {mask.shape}, min: {mask.min()}, max: {mask.max()}")
+                    # Probability map'i sakla (0-1 arası değerler)
+                    probability_map = prediction[0, :, :, 0]
+                    print(f"[DEBUG] Probability map shape: {probability_map.shape}, min: {probability_map.min()}, max: {probability_map.max()}")
+                    
+                    mask = probability_map
                     mask_binary = (mask > 0.5).astype(np.uint8) * 255
                     print(f"[OK] Segmentasyon tamamlandı, mask binary shape: {mask_binary.shape}")
                 except Exception as e:
@@ -257,40 +262,114 @@ def predict_segmentation(image_path):
                     # Fallback to mock
                     mask = create_mock_mask(image_resized)
                     mask_binary = (mask > 0.5).astype(np.uint8) * 255
+                    probability_map = mask
             else:
                 print("[WARNING] Model veya TensorFlow yok, mock kullanılıyor")
                 mask = create_mock_mask(image_resized)
                 mask_binary = (mask > 0.5).astype(np.uint8) * 255
+                probability_map = mask
         
-        # Orijinal boyuta redüz et
+        # Probability map'i orijinal boyuta resize et (metrik hesaplama için)
+        probability_map_original = None
+        if probability_map is not None:
+            probability_map_original = cv2.resize(probability_map, (original_shape[1], original_shape[0]), 
+                                                  interpolation=cv2.INTER_LINEAR)
+            probability_map_original = np.clip(probability_map_original, 0.0, 1.0)
+        
+        # Binary mask'i orijinal boyuta resize et (görselleştirme için)
+        # Binary mask için INTER_NEAREST kullanılmalı
         mask_original = cv2.resize(mask_binary, (original_shape[1], original_shape[0]), 
-                                   interpolation=cv2.INTER_LINEAR)
+                                   interpolation=cv2.INTER_NEAREST)
         mask_original = (mask_original > 127).astype(np.uint8)
         
-        return image_resized, mask_binary, mask_original, {"success": True}
+        return image_resized, mask_binary, mask_original, probability_map_original, {"success": True}
     
     except Exception as e:
-        return None, None, None, {"error": str(e)}
+        return None, None, None, None, {"error": str(e)}
 
 
-def calculate_metrics(ground_truth, prediction):
-    """DICE ve IoU hesapla"""
+def calculate_metrics(ground_truth, prediction, smooth=1e-6):
+    """
+    DICE ve IoU hesapla (eğitim modülüyle uyumlu)
+    
+    Dice Coefficient = (2 * |A ∩ B| + smooth) / (|A| + |B| + smooth)
+    IoU (Jaccard Index) = |A ∩ B| / |A ∪ B|
+    
+    Not: Bu metrikler sadece ground truth varsa anlamlıdır.
+    Sınıf dengesizliği problemi nedeniyle confidence score kullanmak yanlıştır.
+    
+    Bu fonksiyon ML modülündeki metric_utils fonksiyonlarıyla uyumludur.
+    
+    Args:
+        ground_truth: Binary ground truth mask (0-1 veya 0-255 aralığında)
+        prediction: Binary prediction mask (0-1 veya 0-255 aralığında) veya probability map
+        smooth: Smoothing faktörü (varsayılan: 1e-6, ML modülüyle aynı)
+    
+    Returns:
+        dict: {"dice": float, "iou": float}
+    """
     try:
-        # DICE
-        intersection = np.sum(ground_truth * prediction)
-        dice = (2.0 * intersection) / (np.sum(ground_truth) + np.sum(prediction) + 1e-7)
+        # Ground truth'u binary yap (0-1 aralığına normalize et)
+        if ground_truth.max() > 1.0:
+            gt = (ground_truth > 127).astype(np.float32)
+        else:
+            gt = (ground_truth > 0.5).astype(np.float32)
         
-        # IoU (Jaccard)
-        union = np.sum(np.logical_or(ground_truth, prediction))
-        intersection = np.sum(np.logical_and(ground_truth, prediction))
-        iou = intersection / (union + 1e-7)
+        # Prediction'ı normalize et (probability map veya binary mask olabilir)
+        if prediction.max() > 1.0:
+            pred = np.clip(prediction.astype(np.float32) / 255.0, 0.0, 1.0)
+        else:
+            pred = np.clip(prediction.astype(np.float32), 0.0, 1.0)
+        
+        # ML modülünde metrikler probability map üzerinden hesaplanıyor
+        # (y_true binary, y_pred probability map)
+        # Bu yüzden prediction'ı doğrudan kullanıyoruz (binary yapmıyoruz)
+        # Bu, eğitim metrikleriyle daha uyumlu sonuçlar verir
+        
+        # Intersection: İki mask'ın kesişimi
+        # gt binary (0 veya 1), pred probability map (0-1 arası)
+        intersection = np.sum(gt * pred)
+        
+        # DICE Coefficient: (2 * |A ∩ B| + smooth) / (|A| + |B| + smooth)
+        # ML modülündeki formülle aynı (smooth pay'da da var)
+        sum_gt = np.sum(gt)  # Ground truth binary, bu yüzden toplam 1'lerin sayısı
+        sum_pred = np.sum(pred)  # Prediction probability map, toplam olasılık değerleri
+        dice = (2.0 * intersection + smooth) / (sum_gt + sum_pred + smooth)
+        
+        # IoU (Jaccard Index): |A ∩ B| / |A ∪ B|
+        # ML modülündeki formül: union = sum(gt + pred - gt * pred)
+        # Bu, gt binary ve pred probability map için doğru birleşimi verir
+        union = np.sum(gt + pred - gt * pred)
+        iou = (intersection + smooth) / (union + smooth)
+        
+        # NaN ve Inf kontrolü
+        dice = np.nan_to_num(dice, nan=0.0, posinf=1.0, neginf=0.0)
+        iou = np.nan_to_num(iou, nan=0.0, posinf=1.0, neginf=0.0)
+        
+        # Değerleri 0-1 aralığına kısıtla
+        dice = np.clip(dice, 0.0, 1.0)
+        iou = np.clip(iou, 0.0, 1.0)
         
         return {
             "dice": float(dice),
             "iou": float(iou)
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {"dice": 0.0, "iou": 0.0, "error": str(e)}
+
+
+def create_segmented_image(original, mask):
+    """Segmentasyon uygulanmış görüntü oluştur (orijinal görüntü üzerine maske renkli olarak uygulanır)"""
+    # Grayscale -> BGR
+    original_bgr = cv2.cvtColor(original, cv2.COLOR_GRAY2BGR)
+    
+    # Mask bölgelerini kırmızı renkle boya
+    segmented = original_bgr.copy()
+    segmented[mask > 127] = [0, 0, 255]  # Kırmızı
+    
+    return segmented
 
 
 def create_overlay(original, mask, alpha=0.5):
@@ -344,15 +423,34 @@ def upload_image():
         
         # Segmentasyon yap
         print(f"[DEBUG] Segmentasyon başlatılıyor: {filepath}")
-        image_resized, mask_binary, mask_original, status = predict_segmentation(filepath)
+        image_resized, mask_binary, mask_original, probability_map, status = predict_segmentation(filepath)
         
         if image_resized is None:
             error_msg = status.get("error", "Bilinmeyen hata") if isinstance(status, dict) else str(status)
             print(f"[ERROR] Segmentasyon hatası: {error_msg}")
             return jsonify({"error": error_msg}), 400
         
-        # Overlay oluştur
+        # Segmentasyon uygulanmış görüntü ve overlay oluştur
+        segmented = create_segmented_image(image_resized, mask_binary)
         overlay = create_overlay(image_resized, mask_binary, alpha=0.4)
+        
+        # Metrikleri hesapla (tümör hacmi ve alanı)
+        tumor_pixels = np.sum(mask_binary > 127)
+        total_pixels = mask_binary.shape[0] * mask_binary.shape[1]
+        tumor_percentage = (tumor_pixels / total_pixels) * 100.0
+        
+        # DICE ve IoU sadece ground truth varsa anlamlıdır
+        # Ground truth olmadan bu metrikleri hesaplayamayız
+        # (Sınıf dengesizliği problemi nedeniyle confidence score kullanmak yanlıştır)
+        dice_score = None
+        iou_score = None
+        
+        metrics = {
+            "dice": dice_score,  # Ground truth yoksa None
+            "iou": iou_score,    # Ground truth yoksa None
+            "volume": int(tumor_pixels),
+            "area_percentage": float(tumor_percentage)
+        }
         
         # Görüntüleri base64 encode et
         def image_to_base64(img):
@@ -363,10 +461,11 @@ def upload_image():
             "success": True,
             "original": image_to_base64(image_resized),
             "mask": image_to_base64(mask_binary),
+            "segmented": image_to_base64(segmented),
             "overlay": image_to_base64(overlay),
             "filename": filename,
             "has_ground_truth": False,
-            "metrics": None
+            "metrics": metrics
         }
         
         return jsonify(result)
@@ -452,33 +551,62 @@ def load_data_image():
         
         # Segmentasyon yap
         print(f"[DEBUG] Segmentasyon başlatılıyor: {image_path}")
-        image_resized, mask_binary, mask_original, status = predict_segmentation(str(image_path))
+        image_resized, mask_binary, mask_original, probability_map, status = predict_segmentation(str(image_path))
         
         if image_resized is None:
             error_msg = status.get("error", "Bilinmeyen hata") if isinstance(status, dict) else str(status)
             print(f"[ERROR] Segmentasyon hatası: {error_msg}")
             return jsonify({"error": error_msg}), 400
         
-        # Ground truth maskesi varsa yükle ve metrikleri hesapla
-        metrics = None
+        # Metrikleri hesapla
+        # Tümör hacmi ve alanı
+        tumor_pixels = np.sum(mask_binary > 127)
+        total_pixels = mask_binary.shape[0] * mask_binary.shape[1]
+        tumor_percentage = (tumor_pixels / total_pixels) * 100.0
+        
+        # Ground truth maskesi varsa gerçek DICE ve IoU hesapla
+        # DICE ve IoU sadece ground truth varsa anlamlıdır
+        # (Sınıf dengesizliği problemi nedeniyle confidence score kullanmak yanlıştır)
+        dice_score = None
+        iou_score = None
+        
         if mask_path.exists():
             gt_mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
             if gt_mask is not None:
-                # Ground truth'u binary yap
-                gt_binary = (gt_mask > 127).astype(np.uint8)
+                # Ground truth'u binary yap (0-1 aralığına normalize et)
+                gt_binary = (gt_mask > 127).astype(np.float32)
                 
-                # Prediction'ı aynı boyuta getir
-                pred_binary = (mask_original > 127).astype(np.uint8)
+                        # Eğitim modülünde metrikler probability map üzerinden hesaplanıyor
+                # Bu yüzden probability map kullanıyoruz (eğitim metrikleriyle uyumlu olması için)
+                if probability_map is not None:
+                    # Probability map'i ground truth boyutuna resize et
+                    pred_for_metrics = cv2.resize(probability_map, (gt_binary.shape[1], gt_binary.shape[0]), 
+                                                  interpolation=cv2.INTER_LINEAR)
+                    pred_for_metrics = np.clip(pred_for_metrics, 0.0, 1.0)
+                else:
+                    # Probability map yoksa binary mask kullan
+                    pred_for_metrics = (mask_original > 127).astype(np.float32)
+                    if gt_binary.shape != pred_for_metrics.shape:
+                        pred_for_metrics = cv2.resize(pred_for_metrics, (gt_binary.shape[1], gt_binary.shape[0]), 
+                                                      interpolation=cv2.INTER_NEAREST)
+                        pred_for_metrics = (pred_for_metrics > 0.5).astype(np.float32)
                 
-                # Boyutları eşleştir
-                if gt_binary.shape != pred_binary.shape:
-                    pred_binary = cv2.resize(pred_binary, (gt_binary.shape[1], gt_binary.shape[0]), 
-                                            interpolation=cv2.INTER_NEAREST)
-                
-                # Metrikleri hesapla
-                metrics = calculate_metrics(gt_binary, pred_binary)
+                # Gerçek DICE ve IoU hesapla (ML modülüyle uyumlu formül)
+                # calculate_metrics fonksiyonu hem probability map hem binary mask destekler
+                metrics_dict = calculate_metrics(gt_binary, pred_for_metrics)
+                dice_score = metrics_dict.get("dice")
+                iou_score = metrics_dict.get("iou")
+        # else: Ground truth yoksa Dice ve IoU None kalır (yanlış metrik kullanmıyoruz)
         
-        # Overlay oluştur
+        metrics = {
+            "dice": dice_score,
+            "iou": iou_score,
+            "volume": int(tumor_pixels),
+            "area_percentage": float(tumor_percentage)
+        }
+        
+        # Segmentasyon uygulanmış görüntü ve overlay oluştur
+        segmented = create_segmented_image(image_resized, mask_binary)
         overlay = create_overlay(image_resized, mask_binary, alpha=0.4)
         
         # Görüntüleri base64 encode et
@@ -490,6 +618,7 @@ def load_data_image():
             "success": True,
             "original": image_to_base64(image_resized),
             "mask": image_to_base64(mask_binary),
+            "segmented": image_to_base64(segmented),
             "overlay": image_to_base64(overlay),
             "filename": filename,
             "dataset": dataset,
