@@ -9,12 +9,7 @@ import matplotlib.pyplot as plt
 
 
 def find_best_epochs(history: Dict) -> Dict[str, Tuple[int, float]]:
-    """
-    En iyi epoch'ları bulur.
-    
-    Returns:
-        Dict: Her metrik için (epoch_index, value) tuple'ı
-    """
+   
     best_epochs = {}
     
     # En düşük validation loss
@@ -186,14 +181,7 @@ def print_summary(history: Dict, best_epochs: Dict[str, Tuple[int, float]]):
 
 
 def plot_training_history(json_file_path: str, output_path: str = None, show_table: bool = True):
-    """
-    Eğitim geçmişini JSON dosyasından okuyup görselleştirir.
-
-    Args:
-        json_file_path: History JSON dosyasının yolu
-        output_path: Çıktı grafiğinin kaydedileceği yol (opsiyonel)
-        show_table: Epoch tablosunu yazdırıp yazdırmayacağı (varsayılan: True)
-    """
+    
     # 1. JSON verisini dosyadan oku
     json_path = Path(json_file_path)
     try:

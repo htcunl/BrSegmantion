@@ -10,12 +10,7 @@ except ModuleNotFoundError as _e:
 
 
 def _get_tf_version():
-    """Robust TensorFlow version lookup with fallbacks.
-
-    Some environments may provide a tensorflow package without the
-    ``__version__`` attribute (or it may be shadowed). Try multiple
-    ways to obtain a version string and fall back to 'unknown'.
-    """
+ 
     # If tensorflow failed to import, try to obtain metadata, otherwise
     # return a clear 'not-installed' marker.
     if tf is None:

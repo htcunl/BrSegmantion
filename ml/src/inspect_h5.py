@@ -1,14 +1,5 @@
 from __future__ import annotations
 
-"""
-Bir .h5 dosyasının içindeki key ve shape bilgilerini yazdırır.
-
-Kullanım (PowerShell):
-
-    cd "C:\\Users\\Lenovo\\OneDrive\\Desktop\\BrSegmantion\\ml"
-    .\\.venv\\Scripts\\activate
-    python -m src.inspect_h5 --path "C:\\Users\\Lenovo\\Downloads\\archive\\BraTS2020_training_data\\content\\data\\volume_47_slice_65.h5"
-"""
 
 import argparse
 from pathlib import Path

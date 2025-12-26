@@ -8,9 +8,9 @@ Her .h5 dosyasında:
 - `image`: (H, W, 4) float64
 - `mask`:  (H, W, 3) uint8
 
-Biz:
-- image kanal ekseninde normalize edip [0, 255] aralığında tek bir gri görüntü üretiyoruz
-- mask için kanallar üzerinde OR alıp (tümör var/yok) binary maske oluşturuyoruz
+
+- image kanal ekseninde normalize edip [0, 255] aralığında tek bir gri görüntü ürettim.
+- mask için kanallar üzerinde OR alıp (tümör var/yok) binary maske oluşturdum.
 """
 
 import argparse

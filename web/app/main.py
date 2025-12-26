@@ -804,7 +804,7 @@ def initialize_model():
         load_model(None, None)
 
 
-# Uygulama başlatıldığında modeli yükle
+
 initialize_model()
 
 

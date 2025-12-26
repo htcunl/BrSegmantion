@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""
-Beyin MR Tümör Segmentasyonu Web Uygulaması
-Başlatma scripti
-"""
+
 
 import os
 import sys
