@@ -63,6 +63,7 @@ def _augment(image: tf.Tensor, mask: tf.Tensor, config: dict, img_size: int) -> 
         target_size = tf.cast(tf.shape(image)[0:2], tf.float32)
         new_size = tf.cast(target_size * scale, tf.int32)
         image = tf.image.resize(image, new_size)
+        
         mask = tf.image.resize(mask, new_size, method="nearest")
         # Crop or pad to original size
         image = tf.image.resize_with_crop_or_pad(image, img_size, img_size)
