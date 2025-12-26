@@ -1,0 +1,3 @@
+cd C:\Users\Lenovo\Desktop\repo\BrSegmantion; python -m ml.src.plot_training_history --json ml/artifacts/unet_brain_tumor_20251205-163801/history.json
+
+cd C:\Users\Lenovo\Desktop\repo\BrSegmantion\web; python run.py
